@@ -4,26 +4,107 @@ const path = require("path");
 const { execSync } = require("child_process");
 const { flipFuses, FuseV1Options, FuseVersion } = require("@electron/fuses");
 
+// 控制台 UTF-8（修复中文乱码）
+if (process.platform === "win32") {
+    try { execSync("chcp 65001 >nul", { stdio: "ignore" }); } catch(e) {}
+}
+
 // ========== 查找 Typora 安装路径 ==========
 
 function findFromRegistry() {
-    var keys = [
-        "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    var roots = [
         "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+        "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
         "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
     ];
-    for (var i = 0; i < keys.length; i++) {
+    for (var i = 0; i < roots.length; i++) {
         try {
+            // 第1步：用关键词搜索，定位到子项路径（HKEY_ 开头的行）
             var out = execSync(
-                'reg query "' + keys[i] + '" /s /f Typora /c /e',
+                'reg query "' + roots[i] + '" /s /f Typora',
                 { encoding: "utf-8", timeout: 10000 }
             );
-            var m = out.match(/InstallLocation\s+REG_SZ\s+(.+)/i);
-            if (m) {
-                var p = m[1].trim();
-                if (fs.existsSync(path.join(p, "Typora.exe"))) return p;
+            var subKeys = out.split(/\r?\n/)
+                .map(function(s){return s.trim()})
+                .filter(function(s){return /^HKEY_/i.test(s)});
+            // 第2步：对每个匹配的子项，读取全部值，找 InstallLocation
+            for (var j = 0; j < subKeys.length; j++) {
+                try {
+                    var detail = execSync(
+                        'reg query "' + subKeys[j] + '"',
+                        { encoding: "utf-8", timeout: 5000 }
+                    );
+                    var m = detail.match(/InstallLocation\s+REG_SZ\s+(.+)/i);
+                    if (m) {
+                        var p = m[1].trim().replace(/\\/g, "/");
+                        // 去掉末尾斜杠
+                        p = p.replace(/\/+$/, "");
+                        if (fs.existsSync(path.join(p, "Typora.exe"))) return p;
+                    }
+                } catch(e2) {}
             }
         } catch(e) {}
+    }
+    return null;
+}
+
+function findFromShortcut() {
+    var os = require("os");
+    var searchDirs = [
+        path.join(os.homedir(), "Desktop"),
+        "C:/Users/Public/Desktop",
+        path.join(os.homedir(), "AppData/Roaming/Microsoft/Windows/Start Menu/Programs"),
+        "C:/ProgramData/Microsoft/Windows/Start Menu/Programs",
+    ];
+    // 递归收集所有 .lnk
+    function listLnk(dir) {
+        var out = [];
+        try {
+            var stack = [dir];
+            while (stack.length) {
+                var cur = stack.pop();
+                var entries;
+                try { entries = fs.readdirSync(cur, { withFileTypes: true }); } catch(e) { continue; }
+                for (var i = 0; i < entries.length; i++) {
+                    var full = path.join(cur, entries[i].name);
+                    if (entries[i].isDirectory()) {
+                        if (entries[i].name === "Internet Explorer") continue; // 跳过慢目录
+                        stack.push(full);
+                    } else if (entries[i].name.toLowerCase().endsWith(".lnk")) {
+                        out.push(full);
+                    }
+                }
+            }
+        } catch(e) {}
+        return out;
+    }
+    // 用 PowerShell 解析单个 .lnk（单文件调用，避免引号嵌套）
+    function resolveLnk(lnkPath) {
+        // Base64 编码命令，彻底避开引号/空格问题
+        // -NoProfile -ExecutionPolicy Bypass 跳过首次加载；重定向 6>$null 抑制 CLIXML 进度噪音
+        var cmd = '$ErrorActionPreference="SilentlyContinue"; $ProgressPreference="SilentlyContinue"; $ws=New-Object -ComObject WScript.Shell; $ws.CreateShortcut("' + lnkPath.replace(/"/g, '`"') + '").TargetPath';
+        var b64 = Buffer.from(cmd, "utf16le").toString("base64");
+        try {
+            var out = execSync('powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + b64 + ' 6>$null', { encoding: "utf-8", timeout: 5000 });
+            var t = out.trim();
+            if (t) return t;
+        } catch(e) {}
+        return null;
+    }
+
+    var lnkFiles = [];
+    for (var i = 0; i < searchDirs.length; i++) {
+        if (fs.existsSync(searchDirs[i])) {
+            lnkFiles = lnkFiles.concat(listLnk(searchDirs[i]));
+        }
+    }
+    for (var j = 0; j < lnkFiles.length; j++) {
+        // 先按文件名快速过滤
+        if (!/typora/i.test(path.basename(lnkFiles[j], ".lnk"))) continue;
+        var target = resolveLnk(lnkFiles[j]);
+        if (target && /Typora\.exe$/i.test(target) && fs.existsSync(target)) {
+            return { lnk: lnkFiles[j], dir: path.dirname(target) };
+        }
     }
     return null;
 }
@@ -46,12 +127,18 @@ function launch(cliPath) {
     // 1. 命令行参数
     if (cliPath) {
         var r = resolvePath(cliPath);
-        if (r) { console.log("命令行指定: " + r); start(r); return; }
+        if (r) { console.log("Typora 安装路径: " + r + "  【命令行参数】"); start(r); return; }
     }
     // 2. 注册表
     var reg = findFromRegistry();
-    if (reg) { console.log("注册表找到: " + reg); start(reg); return; }
-    // 3. 手动输入
+    if (reg) { console.log("Typora 安装路径: " + reg + "  【注册表】"); start(reg); return; }
+    // 3. 桌面快捷方式
+    var sc = findFromShortcut();
+    if (sc) {
+        console.log("Typora 安装路径: " + sc.dir + "  【桌面快捷方式】");
+        start(sc.dir); return;
+    }
+    // 4. 手动输入
     console.log("未自动找到 Typora，请手动输入路径。");
     console.log("支持: 安装目录 (D:/software/Typora) 或 exe 路径");
     var rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
@@ -288,6 +375,6 @@ W("========== Hook 全部就绪 (MC="+(cachedMC?"已缓存,指纹="+cachedMC.i:"
     } catch(e) {}
 
     try { fs.rmSync(path.join(typoraPath, "typora.log"), { force: true }); } catch(e) {}
-    execSync('start "" "' + EXE_PATH + '"', { encoding: "utf-8" });
     console.log("Typora 已启动。");
+    execSync('start "" "' + EXE_PATH + '"', { encoding: "utf-8" });
 }

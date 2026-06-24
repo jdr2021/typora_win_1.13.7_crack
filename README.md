@@ -1,6 +1,6 @@
 # Typora Windows 激活工具
 
-由于`obsidian`不能像`typora`那样随时随地的打开`markdown`文件，下载网上别人破解工具我又怕ta留后门，所以就学习了这篇 [52破解论坛](https://www.52pojie.cn/forum.php?mod=viewthread&tid=2084047)的文章，将最新版破解了一下。目前破解方法只限于`windows`。
+由于`obsidian`不能像`typora`那样随时随地的打开`markdown`文件，下载网上别人破解工具我又怕ta留后门，所以就学习了这篇 [52破解论坛](https://www.52pojie.cn/forum.php?mod=viewthread\&tid=2084047)的文章，将最新版破解了一下。目前破解方法只限于`windows`。
 
 现在用了两周，暂时没发现有啥bug。
 
@@ -11,22 +11,22 @@
 
 ## 安装包信息
 
-| 项目       | 信息                                                         |
-| ---------- | ------------------------------------------------------------ |
-| **文件名** | `typora-setup-x64.exe`                                       |
-| **版本**   | 1.13.7.0                                                     |
-| **大小**   | ~93.7 MB                                                     |
-| **公司**   | typora.io                                                    |
-| **描述**   | Typora Setup (Inno Setup)                                    |
+| 项目         | 信息                                                                 |
+| ---------- | ------------------------------------------------------------------ |
+| **文件名**    | `typora-setup-x64.exe`                                             |
+| **版本**     | 1.13.7.0                                                           |
+| **大小**     | \~93.7 MB                                                          |
+| **公司**     | typora.io                                                          |
+| **描述**     | Typora Setup (Inno Setup)                                          |
 | **SHA256** | `04dc5d0ec1ddae9ab1d405be578c2d486e48cca9295029f79d532db80032ab40` |
 
----
+***
 
 ## 方法一：脚本注入激活（永久）
 
 通过解压 asar、修改 Electron Fuse、注入 Hook 代码实现永久激活。
 
-### 依赖安装
+### 依赖安装【需管理员权限】
 
 ```bash
 npm install asar @electron/fuses
@@ -95,13 +95,14 @@ Typora 已启动。
 - 运行前请确保 Typora 进程已完全关闭，否则会报 `EBUSY` 错误
 - 脚本会自动备份原始文件（`.bak` 后缀），如需还原可手动恢复
 
----
+***
 
 ## 方法二：重置试用期（无限试用）
 
 直接双击运行 `reset_typora.bat`，或右键选择"以管理员身份运行"。
 
 该脚本会做两件事：
+
 1. 删除注册表 `HKEY_CURRENT_USER\Software\Typora` 下的激活信息
 2. 删除 `%AppData%\Typora\profile.data` 配置文件
 
