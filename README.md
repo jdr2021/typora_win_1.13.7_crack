@@ -2,6 +2,8 @@
 
 由于`obsidian`不能像`typora`那样随时随地的打开`markdown`文件，下载网上别人破解工具我又怕ta留后门，所以就学习了这篇 [52破解论坛](https://www.52pojie.cn/forum.php?mod=viewthread&tid=2084047)的文章，将最新版破解了一下。目前破解方法只限于`windows`。
 
+现在用了两周，暂时没发现有啥bug。
+
 ## 影响版本
 
 - **主要支持**: Typora 1.13.7 (Windows)
