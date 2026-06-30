@@ -236,9 +236,9 @@ async function start(typoraPath) {
     // ========== Hook 注入 ==========
     var hookCode = `
 var hookFs=require("fs"),hookCp=require("child_process"),hookOs=require("os");
+var DEBUG_LOG=false;
 var LOG="${typoraPath.replace(/\\/g,"\\\\")}\\\\typora.log";
-try{hookFs.rmSync(LOG,{force:true})}catch(e){}
-function W(){}  // 调试日志已关闭，如需开启替换为: function W(){var a=arguments;try{hookFs.appendFileSync(LOG,"["+new Date().toISOString()+"] "+Array.prototype.slice.call(a).join(" ")+"\\n")}catch(e){}}
+function W(){if(!DEBUG_LOG)return;var a=arguments;try{hookFs.appendFileSync(LOG,"["+new Date().toISOString()+"] "+Array.prototype.slice.call(a).join(" ")+"\\n")}catch(e){}}
 
 W("========== Hook 启动 ==========");
 
