@@ -238,7 +238,7 @@ async function start(typoraPath) {
 var hookFs=require("fs"),hookCp=require("child_process"),hookOs=require("os");
 var LOG="${typoraPath.replace(/\\/g,"\\\\")}\\\\typora.log";
 try{hookFs.rmSync(LOG,{force:true})}catch(e){}
-function W(){var a=arguments;try{hookFs.appendFileSync(LOG,"["+new Date().toISOString()+"] "+Array.prototype.slice.call(a).join(" ")+"\\n")}catch(e){}}
+function W(){}  // 调试日志已关闭，如需开启替换为: function W(){var a=arguments;try{hookFs.appendFileSync(LOG,"["+new Date().toISOString()+"] "+Array.prototype.slice.call(a).join(" ")+"\\n")}catch(e){}}
 
 W("========== Hook 启动 ==========");
 
@@ -261,11 +261,10 @@ try{
     }
 }catch(e){W("[MC] 缓存未命中 (首次运行)")}
 
-// -- 2. original-fs 路径重定向 --
+// -- 2. fs 路径重定向 --
 var redirectFrom=/resources[\\\\/]app[\\\\/]/i,redirectTo="resources\\\\app.bak\\\\";
-var origFs;(function(){try{origFs=require("original-fs")}catch(e){origFs=null}})();
 var hookedCount=0;
-[hookFs,origFs].filter(Boolean).forEach(function(fsMod){
+[hookFs].forEach(function(fsMod){
     ["readFileSync","readFile","statSync","stat","open","openSync","existsSync","exists","lstatSync","lstat","readdirSync","readdir","accessSync","access","realpathSync","realpath"].forEach(function(p){
         if(typeof fsMod[p]==="function"){var origFn=fsMod[p];fsMod[p]=function(fp){if(typeof fp==="string"&&redirectFrom.test(fp))fp=fp.replace(redirectFrom,redirectTo);return origFn.apply(this,arguments)};hookedCount++}
     });
@@ -273,7 +272,7 @@ var hookedCount=0;
         if(typeof fsMod.promises[p]==="function"){var origP=fsMod.promises[p];fsMod.promises[p]=function(fp){if(typeof fp==="string"&&redirectFrom.test(fp))fp=fp.replace(redirectFrom,redirectTo);return origP.apply(this,arguments)};hookedCount++}
     })}
 });
-W("[HOOK] original-fs 重定向已安装 (orig-fs="+(origFs?"有":"无")+", 函数数="+hookedCount+")");
+W("[HOOK] fs 重定向已安装 (函数数="+hookedCount+")");
 
 // -- 3. 机器码自动捕获 --
 var electron=require("electron"),origHandle=electron.ipcMain.handle;
